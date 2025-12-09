@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>H&O Botic - Sistema Completo</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#f0f8ff;}
+#login-screen{height:100vh;display:flex;justify-content:center;align-items:center;background:#e0f7ff;}
+.card-login{padding:30px;background:#fff;border-radius:15px;box-shadow:0 8px 24px rgba(0,0,0,0.1);width:380px;text-align:center;}
+#system{display:none;}
+.sidebar{width:230px;height:100vh;background:#00bfff;color:#fff;position:fixed;top:0;left:0;overflow:auto;display:none;padding-top:10px;}
+.sidebar .brand{text-align:center;padding:20px;border-bottom:1px solid rgba(255,255,255,0.3);}
+.sidebar .brand img{width:100px;}
+.sidebar a{display:block;padding:12px 20px;color:#fff;text-decoration:none;cursor:pointer;border-radius:8px;margin:5px;}
+.sidebar a:hover,.sidebar a.active{background:#b2ebf2;color:#000;}
+.topbar{height:60px;background:#fff;display:flex;align-items:center;padding:0 20px;box-shadow:0 2px 6px rgba(0,0,0,0.08);margin-left:0;display:none;}
+#main{margin-left:230px;padding:20px;transition: margin-left 0.3s;}
+.page{display:none;}
+.card-ghost{border-radius:12px;padding:18px;background:#e6f7ff;box-shadow:0 6px 18px rgba(16,24,40,0.04);margin-bottom:15px;}
+.autocomplete-list{position:absolute;z-index:1200;background:#fff;border:1px solid #ddd;border-radius:6px;max-height:200px;overflow:auto;width:100%;}
+.autocomplete-item{padding:8px 10px;cursor:pointer;}
+.autocomplete-item:hover{background:#d0f0ff;}
+.btn-pastel{background:#b2ebf2;color:#000;}
+.btn-pastel:hover{background:#81ecec;color:#000;}
+.form-section{padding:15px;border:1px solid #ddd;border-radius:8px;background:#f0fcff;margin-bottom:15px;}
+td input{width:100%;}
+.position-relative{position:relative;}
+.autocomplete-container{position:relative;}
+/* CHATBOT */
+#chatbot{position:fixed;bottom:20px;right:20px;width:300px;background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.2);overflow:hidden;display:flex;flex-direction:column;font-family:Arial,sans-serif;z-index:2000;}
+#chatHeader{background:#00bfff;color:#fff;padding:10px;cursor:pointer;font-weight:700;}
+#chatBody{flex:1;padding:10px;overflow-y:auto;height:250px;display:none;background:#f0f8ff;}
+#chatInputDiv{display:none;padding:10px;border-top:1px solid #ddd;}
+#chatInput{width:100%;padding:6px;border-radius:6px;border:1px solid #ccc;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="card-login">
+    <img src="https://i.imgur.com/y2DPHWS.png" style="width:140px;margin-bottom:10px;">
+    <h4>Iniciar sesión</h4>
+    <input id="user" class="form-control mb-2" placeholder="Usuario">
+    <div class="d-flex mb-2">
+      <input id="pass" type="password" class="form-control" placeholder="Contraseña">
+      <button id="togglePass" class="btn btn-outline-secondary ms-1">👁️</button>
+    </div>
+    <button id="btnLogin" class="btn btn-pastel w-100 mb-2">Ingresar</button>
+    <p id="error" class="text-danger"></p>
+  </div>
+</div>
+
+<!-- SISTEMA -->
+<div id="system">
+  <div class="sidebar">
+    <div class="brand">
+      <img src="https://i.imgur.com/y2DPHWS.png">
+      <div style="margin-top:6px;font-weight:700;">H&O BOTIC</div>
+    </div>
+    <a data-page="inicio" class="active">🏠 Inicio</a>
+    <a data-page="ventas">💲 Ventas</a>
+    <a data-page="clientes">👥 Clientes</a>
+    <a data-page="productos">💊 Productos</a>
+    <a data-page="reportes">📊 Reportes</a>
+    <a data-page="config">⚙ Configuración</a>
+    <a id="link-logout" class="bg-danger text-center mt-3">Salir</a>
+  </div>
+
+  <div class="topbar">
+    <div style="font-weight:700;">Panel de administración</div>
+    <div style="margin-left:auto;" id="userInfo">Usuario: —</div>
+  </div>
+
+  <div id="main">
+    <!-- INICIO -->
+    <section id="inicio" class="page">
+      <h3>Resumen</h3>
+      <div class="row mb-3">
+        <div class="col-md-4"><div class="card-ghost text-center"><h2 id="countProd">0</h2> Productos</div></div>
+        <div class="col-md-4"><div class="card-ghost text-center"><h2 id="countClients">0</h2> Clientes</div></div>
+        <div class="col-md-4"><div class="card-ghost text-center"><h2 id="countStock">0</h2> Stock total</div></div>
+      </div>
+      <div class="card-ghost"><canvas id="summaryChart" height="150"></canvas></div>
+    </section>
+
+    <!-- VENTAS -->
+    <section id="ventas" class="page">
+      <h3>Ventas</h3>
+      <div class="card-ghost mb-3 position-relative autocomplete-container">
+        <div class="row g-2 mb-2">
+          <div class="col-md-4 position-relative">
+            <input id="searchSale" class="form-control" placeholder="Buscar producto...">
+            <div id="autocompleteProduct" class="autocomplete-list"></div>
+          </div>
+          <div class="col-md-2"><input type="number" id="qtySale" class="form-control" value="1" min="1"></div>
+          <div class="col-md-4 position-relative">
+            <input id="clientSale" class="form-control" placeholder="Nombre del Cliente">
+            <div id="autocompleteClient" class="autocomplete-list"></div>
+          </div>
+          <div class="col-md-2"><button id="btnAddSale" class="btn btn-pastel w-100">Añadir</button></div>
+        </div>
+        <h5>Carrito</h5>
+        <table class="table table-bordered">
+          <thead><tr><th>Producto</th><th>Cant</th><th>Precio</th><th>Subtotal</th><th>Cliente</th><th>Acción</th></tr></thead>
+          <tbody id="cartTbody"></tbody>
+        </table>
+        <div class="text-end mb-2"><strong>Total: S/<span id="cartTotal">0.00</span></strong></div>
+        <button id="completeSale" class="btn btn-success mb-2">Completar Venta</button>
+        <h5>Reporte de Ventas</h5>
+        <table class="table table-bordered">
+          <thead><tr><th>Cliente</th><th>Producto</th><th>Cant</th><th>Total</th><th>Acción</th></tr></thead>
+          <tbody id="salesReport"></tbody>
+        </table>
+        <div class="text-end"><strong>Total Vendido: S/<span id="totalSold">0.00</span></strong></div>
+      </div>
+    </section>
+
+    <!-- CLIENTES -->
+    <section id="clientes" class="page">
+      <h3>Clientes</h3>
+      <div class="card-ghost form-section">
+        <h5>Añadir Cliente</h5>
+        <div class="row g-2">
+          <div class="col-md-2"><input type="text" id="newClientCode" class="form-control" placeholder="Código" readonly></div>
+          <div class="col-md-4"><input type="text" id="newClientName" class="form-control" placeholder="Nombre"></div>
+          <div class="col-md-2"><input type="text" id="newClientDoc" class="form-control" placeholder="Documento"></div>
+          <div class="col-md-2"><input type="text" id="newClientPhone" class="form-control" placeholder="Teléfono"></div>
+          <div class="col-md-2"><input type="text" id="newClientEmail" class="form-control" placeholder="Email"></div>
+        </div>
+        <button id="addClientBtn" class="btn btn-pastel mt-2">Añadir Cliente</button>
+      </div>
+      <input id="searchClient" class="form-control mb-2" placeholder="Buscar cliente...">
+      <table class="table table-bordered">
+        <thead><tr><th>Código</th><th>Nombre</th><th>Documento</th><th>Teléfono</th><th>Email</th><th>Acciones</th></tr></thead>
+        <tbody id="clientsTable"></tbody>
+      </table>
+    </section>
+
+    <!-- PRODUCTOS -->
+    <section id="productos" class="page">
+      <h3>Productos</h3>
+      <div class="card-ghost form-section">
+        <h5>Añadir Producto</h5>
+        <div class="row g-2">
+          <div class="col-md-2"><input type="text" id="newProductCode" class="form-control" placeholder="Código" readonly></div>
+          <div class="col-md-4"><input type="text" id="newProductName" class="form-control" placeholder="Nombre"></div>
+          <div class="col-md-2"><input type="number" id="newProductStock" class="form-control" placeholder="Stock"></div>
+          <div class="col-md-2"><input type="number" id="newProductPrice" class="form-control" placeholder="Precio"></div>
+          <div class="col-md-2"><button id="addProductBtn" class="btn btn-pastel w-100">Añadir</button></div>
+        </div>
+      </div>
+      <input id="searchProduct" class="form-control mb-2" placeholder="Buscar producto...">
+      <table class="table table-bordered">
+        <thead><tr><th>Código</th><th>Nombre</th><th>Stock</th><th>Precio</th><th>Acciones</th></tr></thead>
+        <tbody id="productsTable"></tbody>
+      </table>
+    </section>
+
+    <!-- REPORTES -->
+    <section id="reportes" class="page">
+      <h3>Reportes</h3>
+      <div class="card-ghost mb-3">
+        <button id="exportExcel" class="btn btn-pastel mb-2">Exportar Excel</button>
+        <button id="exportPDF" class="btn btn-pastel mb-2">Exportar PDF</button>
+      </div>
+      <div class="card-ghost">
+        <h5>Gráfico Ventas por Producto</h5>
+        <canvas id="salesChart" height="150"></canvas>
+      </div>
+    </section>
+
+    <!-- CONFIGURACIÓN -->
+    <section id="config" class="page">
+      <h3>Configuración</h3>
+      <div class="card-ghost form-section">
+        <h5>Editar Configuración</h5>
+        <label>Nombre de la Botica:</label>
+        <input type="text" id="configName" class="form-control mb-2" placeholder="Nombre de la Botica">
+        <label>Teléfono:</label>
+        <input type="text" id="configPhone" class="form-control mb-2" placeholder="Teléfono">
+        <label>Email:</label>
+        <input type="text" id="configEmail" class="form-control mb-2" placeholder="Email">
+        <button id="saveConfig" class="btn btn-pastel mt-2">Guardar Configuración</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- CHATBOT -->
+<div id="chatbot">
+  <div id="chatHeader">ChatBot 💊</div>
+  <div id="chatBody"></div>
+  <div id="chatInputDiv">
+    <input id="chatInput" type="text" placeholder="Escribe tu consulta...">
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+
+// LOGIN
+const LOGIN_USER='Keyla Nima';
+const LOGIN_PASS='olinda';
+const $=id=>document.getElementById(id);
+const sidebar=document.querySelector('.sidebar');
+const topbar=document.querySelector('.topbar');
+const links=document.querySelectorAll('.sidebar a[data-page]');
+
+let products=JSON.parse(localStorage.getItem('ho_products'))||[];
+let clients=JSON.parse(localStorage.getItem('ho_clients'))||[];
+let cart=JSON.parse(localStorage.getItem('ho_cart'))||[];
+let sales=JSON.parse(localStorage.getItem('ho_sales'))||[];
+
+function saveAll(){
+  localStorage.setItem('ho_products',JSON.stringify(products));
+  localStorage.setItem('ho_clients',JSON.stringify(clients));
+  localStorage.setItem('ho_cart',JSON.stringify(cart));
+  localStorage.setItem('ho_sales',JSON.stringify(sales));
+}
+
+// --- LOGIN ---
+function login(){
+  const u=$('user').value.trim();
+  const p=$('pass').value.trim();
+  if(u.toLowerCase()===LOGIN_USER.toLowerCase() && p===LOGIN_PASS){
+    $('login-screen').style.display='none';
+    $('system').style.display='block';
+    sidebar.style.display='block';
+    topbar.style.display='flex';
+    $('userInfo').textContent='Usuario: '+LOGIN_USER;
+    renderAll();
+    showPage('inicio');
+  } else $('error').textContent='Usuario o contraseña incorrectos';
+}
+$('btnLogin').addEventListener('click',login);
+$('togglePass').addEventListener('click',()=>{$('pass').type=$('pass').type==='password'?'text':'password';});
+$('link-logout').addEventListener('click',()=>location.reload());
+links.forEach(el=>el.addEventListener('click',()=>showPage(el.dataset.page)));
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.style.display='none');
+  $(id).style.display='block';
+  links.forEach(l=>l.classList.remove('active'));
+  document.querySelector(`.sidebar a[data-page="${id}"]`).classList.add('active');
+}
+
+// RENDER
+function renderAll(){renderCounts(); renderProducts(); renderClients(); renderCart(); renderSalesReport(); renderSalesChart();}
+function renderCounts(){
+  $('countProd').textContent=products.length;
+  $('countClients').textContent=clients.length;
+  $('countStock').textContent=products.reduce((a,b)=>a+b.stock,0);
+  renderSummaryChart();
+}
+function renderSummaryChart(){
+  const ctx=document.getElementById('summaryChart').getContext('2d');
+  if(window.summaryChart) window.summaryChart.destroy();
+  window.summaryChart=new Chart(ctx,{
+    type:'bar',
+    data:{labels:products.map(p=>p.name),datasets:[{label:'Stock',data:products.map(p=>p.stock),backgroundColor:'#00bfff'}]},
+    options:{responsive:true,plugins:{legend:{display:false}}}
+  });
+}
+function renderSalesChart(){
+  const ctx=document.getElementById('salesChart').getContext('2d');
+  const prodNames=[...new Set(sales.map(s=>s.name))];
+  const totals=prodNames.map(name=>sales.filter(s=>s.name===name).reduce((a,b)=>a+b.qty,0));
+  if(window.salesChart) window.salesChart.destroy();
+  window.salesChart=new Chart(ctx,{
+    type:'pie',
+    data:{labels:prodNames,datasets:[{label:'Ventas',data:totals,backgroundColor:prodNames.map(()=>`hsl(${Math.random()*360},70%,60%)`)}]},
+    options:{responsive:true}
+  });
+}
+
+// PRODUCTOS
+function renderProducts(filter=''){
+  const tbl=$('productsTable'); tbl.innerHTML='';
+  let filtered = products;
+  if(filter) filtered = products.filter(p=>p.name.toLowerCase().includes(filter.toLowerCase())||p.code.toLowerCase().includes(filter.toLowerCase()));
+  filtered.forEach(p=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${p.code}</td><td>${p.name}</td><td>${p.stock}</td><td>${p.price.toFixed(2)}</td>
+    <td>
+      <button class="btn btn-sm btn-pastel" onclick="updateProduct('${p.id}')">Actualizar</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p.id}')">Eliminar</button>
+    </td>`;
+    tbl.appendChild(tr);
+  });
+  $('newProductCode').value='P'+String(products.length+1).padStart(3,'0');
+}
+$('addProductBtn').addEventListener('click',()=>{
+  const code=$('newProductCode').value,name=$('newProductName').value,stock=Number($('newProductStock').value),price=Number($('newProductPrice').value);
+  if(!name||!stock||!price)return alert('Completa todos los campos');
+  const prod={id:Date.now().toString(),code,name,stock,price};
+  products.push(prod);
+  saveAll();
+  renderAll();
+  $('newProductName').value=$('newProductStock').value=$('newProductPrice').value='';
+});
+function updateProduct(id){
+  const p=products.find(x=>x.id===id);
+  const name=prompt('Nombre:',p.name);
+  const stock=prompt('Stock:',p.stock);
+  const price=prompt('Precio:',p.price);
+  if(name)p.name=name; if(stock)p.stock=Number(stock); if(price)p.price=Number(price);
+  saveAll(); renderAll();
+}
+function deleteProduct(id){if(confirm('Eliminar producto?')){products=products.filter(x=>x.id!==id);saveAll();renderAll();}}
+$('searchProduct').addEventListener('input',()=>renderProducts($('searchProduct').value));
+
+// CLIENTES
+function renderClients(filter=''){
+  const tbl=$('clientsTable'); tbl.innerHTML='';
+  let filtered=clients;
+  if(filter) filtered=clients.filter(c=>c.name.toLowerCase().includes(filter.toLowerCase())||c.code.toLowerCase().includes(filter.toLowerCase()));
+  filtered.forEach(c=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${c.code}</td><td>${c.name}</td><td>${c.doc}</td><td>${c.phone}</td><td>${c.email}</td>
+    <td>
+      <button class="btn btn-sm btn-pastel" onclick="updateClient('${c.id}')">Actualizar</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteClient('${c.id}')">Eliminar</button>
+    </td>`;
+    tbl.appendChild(tr);
+  });
+  $('newClientCode').value='C'+String(clients.length+1).padStart(3,'0');
+}
+$('addClientBtn').addEventListener('click',()=>{
+  const code=$('newClientCode').value,name=$('newClientName').value,doc=$('newClientDoc').value,phone=$('newClientPhone').value,email=$('newClientEmail').value;
+  if(!name)return alert('Nombre requerido');
+  const cli={id:Date.now().toString(),code,name,doc,phone,email};
+  clients.push(cli);
+  saveAll(); renderAll();
+  $('newClientName').value=$('newClientDoc').value=$('newClientPhone').value=$('newClientEmail').value='';
+});
+function updateClient(id){
+  const c=clients.find(x=>x.id===id);
+  const name=prompt('Nombre:',c.name);
+  const doc=prompt('Documento:',c.doc);
+  const phone=prompt('Teléfono:',c.phone);
+  const email=prompt('Email:',c.email);
+  if(name)c.name=name; if(doc)c.doc=doc; if(phone)c.phone=phone; if(email)c.email=email;
+  saveAll(); renderAll();
+}
+function deleteClient(id){if(confirm('Eliminar cliente?')){clients=clients.filter(x=>x.id!==id);saveAll();renderAll();}}
+$('searchClient').addEventListener('input',()=>renderClients($('searchClient').value));
+
+// VENTAS
+function renderCart(){
+  const tbody=$('cartTbody'); tbody.innerHTML='';
+  let total=0;
+  cart.forEach(item=>{
+    const tr=document.createElement('tr');
+    const subtotal=item.qty*item.price;
+    total+=subtotal;
+    tr.innerHTML=`<td>${item.name}</td><td>${item.qty}</td><td>${item.price.toFixed(2)}</td><td>${subtotal.toFixed(2)}</td><td>${item.client}</td>
+    <td><button class="btn btn-sm btn-danger" onclick="removeCart('${item.id}')">Eliminar</button></td>`;
+    tbody.appendChild(tr);
+  });
+  $('cartTotal').textContent=total.toFixed(2);
+}
+function removeCart(id){cart=cart.filter(x=>x.id!==id);saveAll();renderCart();}
+$('btnAddSale').addEventListener('click',()=>{
+  const prodName=$('searchSale').value.trim();
+  const client=$('clientSale').value.trim();
+  const qty=Number($('qtySale').value);
+  if(!prodName||!client||!qty)return alert('Completa todos los campos');
+  const prod=products.find(p=>p.name.toLowerCase()===prodName.toLowerCase());
+  if(!prod)return alert('Producto no encontrado');
+  cart.push({id:Date.now().toString(),name:prod.name,qty,price:prod.price,client});
+  saveAll(); renderCart();
+});
+$('completeSale').addEventListener('click',()=>{
+  if(cart.length===0)return alert('Carrito vacío');
+  cart.forEach(item=>{
+    sales.push({id:item.id,name:item.name,qty:item.qty,total:item.price*item.qty,client:item.client});
+    const prod=products.find(p=>p.name===item.name);
+    if(prod)prod.stock-=item.qty;
+  });
+  cart=[];
+  saveAll(); renderAll();
+});
+
+function renderSalesReport(){
+  const tbody=$('salesReport'); tbody.innerHTML='';
+  let total=0;
+  sales.forEach(s=>{
+    total+=s.total;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${s.client}</td><td>${s.name}</td><td>${s.qty}</td><td>${s.total.toFixed(2)}</td>
+    <td><button class="btn btn-sm btn-danger" onclick="deleteSale('${s.id}')">Eliminar</button></td>`;
+    tbody.appendChild(tr);
+  });
+  $('totalSold').textContent=total.toFixed(2);
+}
+function deleteSale(id){sales=sales.filter(s=>s.id!==id);saveAll();renderAll();}
+
+// AUTOCOMPLETE
+function setupAutocomplete(input,arr){
+  input.addEventListener('input',()=>{
+    const val=input.value.toLowerCase();
+    const list=document.createElement('div'); list.className='autocomplete-list';
+    list.style.width=input.offsetWidth+'px'; input.parentNode.querySelectorAll('.autocomplete-list').forEach(e=>e.remove());
+    const matches=arr.filter(x=>x.name.toLowerCase().includes(val));
+    matches.forEach(m=>{
+      const item=document.createElement('div'); item.className='autocomplete-item'; item.textContent=m.name;
+      item.addEventListener('click',()=>{input.value=m.name; list.remove();});
+      list.appendChild(item);
+    });
+    if(matches.length>0)input.parentNode.appendChild(list);
+  });
+}
+setupAutocomplete($('searchSale'),products);
+setupAutocomplete($('clientSale'),clients);
+
+// CHATBOT
+const chatHeader=document.getElementById('chatHeader');
+const chatBody=document.getElementById('chatBody');
+const chatInputDiv=document.getElementById('chatInputDiv');
+const chatInput=document.getElementById('chatInput');
+
+chatHeader.addEventListener('click',()=>{
+  const isOpen=chatBody.style.display==='block';
+  chatBody.style.display=chatInputDiv.style.display=isOpen?'none':'block';
+});
+function addMessage(msg,from='bot'){
+  const div=document.createElement('div'); div.style.marginBottom='8px'; div.style.padding='6px 8px'; div.style.borderRadius='8px';
+  if(from==='bot'){div.style.background='#00bfff'; div.style.color='#fff'; div.style.alignSelf='flex-start';} 
+  else{div.style.background='#b2ebf2'; div.style.color='#000'; div.style.alignSelf='flex-end';}
+  div.textContent=msg;
+  chatBody.appendChild(div);
+  chatBody.scrollTop=chatBody.scrollHeight;
+}
+chatInput.addEventListener('keypress',(e)=>{
+  if(e.key==='Enter'){
+    const text=chatInput.value.trim(); if(!text)return;
+    addMessage(text,'user'); chatInput.value='';
+    handleQuery(text);
+  }
+});
+function handleQuery(query){
+  const lower=query.toLowerCase();
+
+  // Diccionario de palabras clave → productos
+  const keywords = {
+    'dolor de cabeza': ['Paracetamol'],
+    'fiebre': ['Paracetamol', 'Ibuprofeno'],
+    'tos': ['JarabeX'],
+    'resfriado': ['JarabeX', 'Vitamina C'],
+    'gripe': ['Paracetamol', 'JarabeX', 'Vitamina C']
+  };
+
+  let found = [];
+  for(const key in keywords){
+    if(lower.includes(key)) found.push(...keywords[key]);
+  }
+
+  // Filtrar los productos existentes en tu inventario
+  const available = found.filter(name => products.some(p => p.name.toLowerCase() === name.toLowerCase()));
+
+  if(available.length > 0){
+    let resp = 'Según tus productos, puedes usar:\n';
+    available.forEach(p => {
+      const prod = products.find(x=>x.name.toLowerCase()===p.toLowerCase());
+      resp += `- ${prod.name} (Stock: ${prod.stock})\n`;
+    });
+    addMessage(resp);
+  } else {
+    addMessage('Lo siento, no encontré productos que coincidan con eso.');
+  }
+}
+
+
+renderAll();
+});
+</script>
+
+</body>
+</html>
